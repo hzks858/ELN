@@ -1,0 +1,5 @@
+{
+  "name": "HelixELN GMP",
+  "description": "一个高保真 GMP 电子实验记录本原型，具有实验跟踪、库存管理、HPLC 分析和审计追踪功能。",
+  "requestFramePermissions": []
+}
