@@ -3,7 +3,6 @@ import { SignatureModal } from '../components/SignatureModal';
 import { EditableText, EditableImage } from '../components/Editable';
 import { useAuth } from '../context/AuthContext';
 import { useDesign } from '../context/DesignContext';
-import { useNotification } from '../context/NotificationContext';
 
 // --- Interfaces ---
 
@@ -152,33 +151,10 @@ const INITIAL_BOMS: BOMTemplate[] = [
 // --- Main Controller Component ---
 
 export const ExperimentEditor: React.FC = () => {
-    const { addNotification } = useNotification();
-    const { hasPermission } = useAuth();
     const [activeExperimentId, setActiveExperimentId] = useState<string | null>(null);
     const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
     const [experiments, setExperiments] = useState<ExperimentMetadata[]>(MOCK_EXPERIMENTS);
     
-    useEffect(() => {
-        // Simulate checking for upcoming deadlines
-        const activeExp = experiments.find(e => e.status === '进行中');
-        if (activeExp) {
-            const key = `deadline_notified_${activeExp.id}`;
-            if (!sessionStorage.getItem(key)) {
-                // Delay slightly to not overwhelm on load
-                setTimeout(() => {
-                    addNotification({
-                        type: 'info',
-                        title: '实验进度提醒',
-                        message: `实验 "${activeExp.title}" 距离预定节点还有 2 小时。`,
-                        actionLabel: '查看',
-                        onAction: () => setActiveExperimentId(activeExp.id)
-                    });
-                    sessionStorage.setItem(key, 'true');
-                }, 1500);
-            }
-        }
-    }, []);
-
     // Manage expanded state for projects (can have multiple open)
     const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set([MOCK_PROJECTS[0].id]));
 
@@ -202,10 +178,6 @@ export const ExperimentEditor: React.FC = () => {
     };
 
     const createProject = (parentId?: string) => {
-        if (!hasPermission('create_experiment')) {
-            addNotification({ type: 'error', title: '权限不足', message: '您没有创建项目的权限。', timestamp: Date.now(), read: false });
-            return;
-        }
         const newId = `PROJ-${Math.floor(Math.random() * 10000)}`;
         const newProj: Project = {
             id: newId,
@@ -226,15 +198,10 @@ export const ExperimentEditor: React.FC = () => {
     };
 
     const updateProject = (id: string, updates: Partial<Project>) => {
-        if (!hasPermission('edit_experiment')) return; // Reusing edit_experiment for project editing
         setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     };
 
     const deleteProject = (id: string) => {
-        if (!hasPermission('delete_experiment')) {
-            addNotification({ type: 'error', title: '权限不足', message: '您没有删除项目的权限。', timestamp: Date.now(), read: false });
-            return;
-        }
         if (confirm('确定要删除此项目及其所有子项目吗？此操作不可恢复。')) {
             // Helper to recursively find all child IDs
             const getIdsToDelete = (currentId: string, allProjects: Project[]): string[] => {
@@ -264,10 +231,6 @@ export const ExperimentEditor: React.FC = () => {
     };
 
     const createExperiment = (projectId: string) => {
-        if (!hasPermission('create_experiment')) {
-            addNotification({ type: 'error', title: '权限不足', message: '您没有创建实验的权限。', timestamp: Date.now(), read: false });
-            return;
-        }
         const newExp: ExperimentMetadata = {
             id: `EXP-2023-${Math.floor(Math.random() * 10000)}`,
             projectId: projectId,
@@ -329,7 +292,6 @@ const ProjectAccordionItem: React.FC<{
     onDeleteProject: (id: string) => void;
     onCreateExperiment: (projectId: string) => void;
 }> = ({ project, allProjects, experiments, expandedIds, depth, onToggle, onSelectExperiment, onCreateProject, onUpdateProject, onDeleteProject, onCreateExperiment }) => {
-    const { hasPermission } = useAuth();
     const isExpanded = expandedIds.has(project.id);
     const childProjects = allProjects.filter(p => p.parentId === project.id);
     const projectExperiments = experiments.filter(e => e.projectId === project.id);
@@ -367,7 +329,6 @@ const ProjectAccordionItem: React.FC<{
                                 id={`proj-t-${project.id}`} 
                                 defaultValue={project.title} 
                                 onSave={(val) => onUpdateProject(project.id, { title: val })}
-                                readOnly={!hasPermission('edit_experiment')}
                             />
                             <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase tracking-wider font-bold ${
                                 project.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : 
@@ -380,15 +341,13 @@ const ProjectAccordionItem: React.FC<{
                             {depth > 0 && <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded mr-2">Level {depth + 1}</span>}
                             
                             {/* Delete Project Button */}
-                            {hasPermission('delete_experiment') && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
-                                    className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors"
-                                    title="删除项目"
-                                >
-                                    <span className="material-icons text-base">delete_outline</span>
-                                </button>
-                            )}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
+                                className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors"
+                                title="删除项目"
+                            >
+                                <span className="material-icons text-base">delete_outline</span>
+                            </button>
 
                             <button className={`h-7 w-7 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-800 transition-transform duration-300 ${isExpanded ? 'rotate-180 bg-primary/10 text-primary' : ''}`}>
                                 <span className="material-icons text-base">expand_more</span>
@@ -400,7 +359,6 @@ const ProjectAccordionItem: React.FC<{
                             id={`proj-d-${project.id}`} 
                             defaultValue={project.description} 
                             onSave={(val) => onUpdateProject(project.id, { description: val })}
-                            readOnly={!hasPermission('edit_experiment')}
                         />
                     </p>
                     
@@ -438,7 +396,7 @@ const ProjectAccordionItem: React.FC<{
                                     <span className="material-icons text-xs">subdirectory_arrow_right</span>
                                     子项目 ({childProjects.length})
                                 </h4>
-                                {depth < MAX_DEPTH && hasPermission('create_experiment') && (
+                                {depth < MAX_DEPTH && (
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onCreateProject(project.id); }}
                                         className="text-[10px] font-bold text-primary hover:text-primary-hover flex items-center gap-1 px-2 py-1 rounded hover:bg-primary/5 transition-colors"
@@ -512,17 +470,15 @@ const ProjectAccordionItem: React.FC<{
                             ))}
 
                             {/* Add Experiment Button */}
-                            {hasPermission('create_experiment') && (
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onCreateExperiment(project.id); }}
-                                    className="min-h-[120px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-transparent hover:bg-white hover:border-primary hover:text-primary text-slate-400 transition-all flex flex-col items-center justify-center group/add"
-                                >
-                                    <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 group-hover/add:bg-primary/10 flex items-center justify-center mb-2 transition-colors">
-                                        <span className="material-icons text-base">add</span>
-                                    </div>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest">添加新实验</span>
-                                </button>
-                            )}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onCreateExperiment(project.id); }}
+                                className="min-h-[120px] rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-transparent hover:bg-white hover:border-primary hover:text-primary text-slate-400 transition-all flex flex-col items-center justify-center group/add"
+                            >
+                                <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 group-hover/add:bg-primary/10 flex items-center justify-center mb-2 transition-colors">
+                                    <span className="material-icons text-base">add</span>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-widest">添加新实验</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -544,7 +500,6 @@ const ProjectsDashboard: React.FC<{
     onDeleteProject: (id: string) => void;
     onCreateExperiment: (projectId: string) => void;
 }> = ({ projects, experiments, expandedIds, onToggleProject, onSelectExperiment, onCreateProject, onUpdateProject, onDeleteProject, onCreateExperiment }) => {
-    const { hasPermission } = useAuth();
     // Only render root projects (those without parentId) at the top level
     const rootProjects = projects.filter(p => !p.parentId);
 
@@ -556,15 +511,13 @@ const ProjectsDashboard: React.FC<{
                         <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">项目实验室</h1>
                         <p className="text-sm text-slate-500 mt-2">支持多层级项目管理与实验记录追踪</p>
                     </div>
-                    {hasPermission('create_experiment') && (
-                        <button 
-                            onClick={() => onCreateProject()}
-                            className="px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-105 transition-all text-sm font-bold flex items-center gap-2"
-                        >
-                            <span className="material-icons text-sm">create_new_folder</span>
-                            新建根项目
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => onCreateProject()}
+                        className="px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl shadow-lg hover:scale-105 transition-all text-sm font-bold flex items-center gap-2"
+                    >
+                        <span className="material-icons text-sm">create_new_folder</span>
+                        新建根项目
+                    </button>
                 </div>
                 <div className="h-px w-full bg-slate-200 dark:bg-slate-800"></div>
             </header>
@@ -589,15 +542,13 @@ const ProjectsDashboard: React.FC<{
                     ))}
                     
                     {/* Add Project Big Button */}
-                    {hasPermission('create_experiment') && (
-                        <button 
-                            onClick={() => onCreateProject()}
-                            className="w-full py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 hover:text-primary hover:border-primary hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 group mt-4"
-                        >
-                            <span className="material-icons text-3xl group-hover:scale-110 transition-transform">playlist_add</span>
-                            <span className="text-sm font-bold uppercase tracking-widest">创建新的项目容器</span>
-                        </button>
-                    )}
+                    <button 
+                        onClick={() => onCreateProject()}
+                        className="w-full py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400 hover:text-primary hover:border-primary hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 group mt-4"
+                    >
+                        <span className="material-icons text-3xl group-hover:scale-110 transition-transform">playlist_add</span>
+                        <span className="text-sm font-bold uppercase tracking-widest">创建新的项目容器</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -612,11 +563,9 @@ const SingleExperimentEditor: React.FC<{
     onBack: () => void,
     onUpdateTitle: (t: string) => void
 }> = ({ metadata, project, onBack, onUpdateTitle }) => {
-    const { user, hasPermission } = useAuth();
+    const { user } = useAuth();
     const { edits, updateEdit, isEditing } = useDesign();
     const [isSignatureOpen, setIsSignatureOpen] = useState(false);
-    
-    const canEdit = hasPermission('edit_experiment');
     
     // Library States
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -906,7 +855,6 @@ const SingleExperimentEditor: React.FC<{
                                         onUpdateTitle(v);
                                         addHistory("编辑信息", `实验标题更改为: "${v}"`, "edit", "bg-blue-500");
                                     }}
-                                    readOnly={!canEdit}
                                 />
                              </h1>
                         </div>
@@ -954,7 +902,7 @@ const SingleExperimentEditor: React.FC<{
                         <section className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden p-6">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">实验方案图谱 (Protocol)</h2>
-                                {protocolFile && isEditing && canEdit && (
+                                {protocolFile && isEditing && (
                                     <button 
                                         onClick={() => protocolFileInputRef.current?.click()}
                                         className="text-[10px] font-bold text-primary hover:underline uppercase"
@@ -965,8 +913,8 @@ const SingleExperimentEditor: React.FC<{
                             </div>
                             
                             <div className={`w-full min-h-[12rem] bg-slate-50 dark:bg-slate-900 rounded-lg border-2 border-dashed transition-all flex items-center justify-center overflow-hidden
-                                ${protocolFile ? 'border-transparent' : canEdit ? 'border-slate-200 dark:border-slate-700 hover:border-primary/50 cursor-pointer' : 'border-slate-200 dark:border-slate-700 cursor-not-allowed'}
-                            `} onClick={() => canEdit && !protocolFile && protocolFileInputRef.current?.click()}>
+                                ${protocolFile ? 'border-transparent' : 'border-slate-200 dark:border-slate-700 hover:border-primary/50 cursor-pointer'}
+                            `} onClick={() => !protocolFile && protocolFileInputRef.current?.click()}>
                                 
                                 <input 
                                     type="file" 
@@ -983,7 +931,7 @@ const SingleExperimentEditor: React.FC<{
                                                 <img src={protocolFile.data} alt="Protocol" className="max-h-64 object-contain rounded-lg shadow-sm" />
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                                                     <button onClick={() => setPreviewFile(protocolFile)} className="px-4 py-2 bg-white text-slate-900 text-xs font-bold rounded-lg shadow-lg">查看全图</button>
-                                                    {isEditing && canEdit && <button onClick={() => protocolFileInputRef.current?.click()} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg shadow-lg">更换文件</button>}
+                                                    {isEditing && <button onClick={() => protocolFileInputRef.current?.click()} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg shadow-lg">更换文件</button>}
                                                 </div>
                                             </div>
                                         ) : (
@@ -1046,36 +994,34 @@ const SingleExperimentEditor: React.FC<{
                                             `}
                                         >
                                             {/* Edit Button for Step (Hidden by default, shown on hover) */}
-                                            {canEdit && (
-                                                <div className="absolute top-4 right-4 opacity-0 group-hover/step:opacity-100 transition-opacity z-10 flex gap-2">
-                                                     <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (editingStepId === step.id) {
-                                                                setEditingStepId(null);
-                                                                addHistory("编辑锁定", `完成了对步骤 ${index + 1} 的编辑`, "lock", "bg-slate-400");
-                                                            } else {
-                                                                setEditingStepId(step.id);
-                                                                addHistory("开始编辑", `开始编辑步骤 ${index + 1}`, "edit", "bg-emerald-500");
-                                                            }
-                                                        }}
-                                                        className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-xs font-bold shadow-sm ${
-                                                            isStepEditing 
-                                                            ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
-                                                            : 'bg-white text-slate-600 hover:text-primary hover:border-primary border border-slate-200'
-                                                        }`}
-                                                    >
-                                                        <span className="material-icons text-[14px]">{isStepEditing ? 'check' : 'edit'}</span>
-                                                        {isStepEditing ? '完成' : '编辑'}
+                                            <div className="absolute top-4 right-4 opacity-0 group-hover/step:opacity-100 transition-opacity z-10 flex gap-2">
+                                                 <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (editingStepId === step.id) {
+                                                            setEditingStepId(null);
+                                                            addHistory("编辑锁定", `完成了对步骤 ${index + 1} 的编辑`, "lock", "bg-slate-400");
+                                                        } else {
+                                                            setEditingStepId(step.id);
+                                                            addHistory("开始编辑", `开始编辑步骤 ${index + 1}`, "edit", "bg-emerald-500");
+                                                        }
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-xs font-bold shadow-sm ${
+                                                        isStepEditing 
+                                                        ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+                                                        : 'bg-white text-slate-600 hover:text-primary hover:border-primary border border-slate-200'
+                                                    }`}
+                                                >
+                                                    <span className="material-icons text-[14px]">{isStepEditing ? 'check' : 'edit'}</span>
+                                                    {isStepEditing ? '完成' : '编辑'}
+                                                </button>
+                                                
+                                                {isStepEditing && (
+                                                    <button onClick={() => deleteStep(step.id)} className="p-1.5 bg-white text-slate-300 hover:text-red-500 hover:bg-red-50 border border-slate-200 rounded-lg transition-all" title="删除步骤">
+                                                        <span className="material-icons text-sm">delete_outline</span>
                                                     </button>
-                                                    
-                                                    {isStepEditing && (
-                                                        <button onClick={() => deleteStep(step.id)} className="p-1.5 bg-white text-slate-300 hover:text-red-500 hover:bg-red-50 border border-slate-200 rounded-lg transition-all" title="删除步骤">
-                                                            <span className="material-icons text-sm">delete_outline</span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
 
                                             {dragOverStepId === step.id && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-primary/10 z-20 rounded-xl pointer-events-none border-2 border-primary border-dashed">
@@ -1098,7 +1044,6 @@ const SingleExperimentEditor: React.FC<{
                                                                 defaultValue={step.title} 
                                                                 editing={isStepEditing}
                                                                 onSave={(v) => addHistory("步骤编辑", `步骤 ${index + 1} 的标题已修改为: "${v}"`, "short_text", "bg-blue-400")}
-                                                                readOnly={!canEdit}
                                                             />
                                                         </h3>
                                                         {step.timestamp && <span className="text-[10px] font-mono text-slate-400">{step.timestamp}</span>}
@@ -1116,7 +1061,6 @@ const SingleExperimentEditor: React.FC<{
                                                                         placeholder="输入操作描述..." 
                                                                         editing={isStepEditing}
                                                                         onSave={(v) => addHistory("编辑 SOP", `更新了步骤 ${index + 1} 的标准操作程序内容。`, "edit_note", "bg-slate-600")}
-                                                                        readOnly={!canEdit}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -1134,7 +1078,6 @@ const SingleExperimentEditor: React.FC<{
                                                                         placeholder="点击记录实验现象或实时参数..." 
                                                                         editing={isStepEditing}
                                                                         onSave={(v) => addHistory("添加观察", `步骤 ${index + 1} 的观察记录已更新: "${v.substring(0, 30)}..."`, "visibility", "bg-emerald-500")}
-                                                                        readOnly={!canEdit}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -1148,8 +1091,7 @@ const SingleExperimentEditor: React.FC<{
                                                                 </label>
                                                                 <button 
                                                                     onClick={() => { setActiveStepId(step.id); stepFileInputRef.current?.click(); }}
-                                                                    className={`text-[10px] font-bold flex items-center gap-1 transition-colors ${canEdit ? 'text-primary hover:text-primary-hover cursor-pointer' : 'text-slate-300 cursor-not-allowed'}`}
-                                                                    disabled={!canEdit}
+                                                                    className="text-[10px] font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
                                                                 >
                                                                     <span className="material-icons text-xs">add</span>
                                                                     上传/拖入附件
@@ -1194,9 +1136,7 @@ const SingleExperimentEditor: React.FC<{
                                                                                                 </div>
                                                                                                 <div className="flex gap-1">
                                                                                                     <button onClick={() => setPreviewFile(file)} className="px-2 py-1 text-[10px] font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-600 dark:text-slate-300 hover:text-primary hover:border-primary transition-all">查看</button>
-                                                                                                    {canEdit && (
-                                                                                                        <button onClick={() => removeStepAttachment(step.id, file.id)} className="p-1 text-slate-300 hover:text-red-500 transition-colors"><span className="material-icons text-sm">close</span></button>
-                                                                                                    )}
+                                                                                                    <button onClick={() => removeStepAttachment(step.id, file.id)} className="p-1 text-slate-300 hover:text-red-500 transition-colors"><span className="material-icons text-sm">close</span></button>
                                                                                                 </div>
                                                                                             </div>
                                                                                         );
@@ -1218,24 +1158,20 @@ const SingleExperimentEditor: React.FC<{
                                 })}
 
                                 <div className="flex gap-4 pt-4">
-                                    {canEdit && (
-                                        <>
-                                            <button 
-                                                onClick={() => setIsTemplateModalOpen(true)} 
-                                                className="flex-1 py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2"
-                                            >
-                                                <span className="material-icons text-sm">auto_awesome</span>
-                                                从 SOP / BOM 库导入
-                                            </button>
-                                            <button 
-                                                onClick={() => addStep()} 
-                                                className="px-6 py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
-                                                title="添加自定义空白步骤"
-                                            >
-                                                <span className="material-icons">add</span>
-                                            </button>
-                                        </>
-                                    )}
+                                    <button 
+                                        onClick={() => setIsTemplateModalOpen(true)} 
+                                        className="flex-1 py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all text-xs font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+                                    >
+                                        <span className="material-icons text-sm">auto_awesome</span>
+                                        从 SOP / BOM 库导入
+                                    </button>
+                                    <button 
+                                        onClick={() => addStep()} 
+                                        className="px-6 py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                                        title="添加自定义空白步骤"
+                                    >
+                                        <span className="material-icons">add</span>
+                                    </button>
                                 </div>
                             </div>
                         </section>
@@ -1413,35 +1349,31 @@ const SingleExperimentEditor: React.FC<{
                                                 </div>
                                             </button>
                                             
-                                            {canEdit && (
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 dark:bg-black/60 backdrop-blur rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700">
-                                                    <button 
-                                                        onClick={(e) => openTemplateEditor(e, template)}
-                                                        className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-primary rounded transition-colors"
-                                                        title="编辑模板"
-                                                    >
-                                                        <span className="material-icons text-sm">edit</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={(e) => deleteTemplate(e, template.id)}
-                                                        className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-red-500 rounded transition-colors"
-                                                        title="删除模板"
-                                                    >
-                                                        <span className="material-icons text-sm">delete</span>
-                                                    </button>
-                                                </div>
-                                            )}
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 dark:bg-black/60 backdrop-blur rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700">
+                                                <button 
+                                                    onClick={(e) => openTemplateEditor(e, template)}
+                                                    className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-primary rounded transition-colors"
+                                                    title="编辑模板"
+                                                >
+                                                    <span className="material-icons text-sm">edit</span>
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => deleteTemplate(e, template.id)}
+                                                    className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-red-500 rounded transition-colors"
+                                                    title="删除模板"
+                                                >
+                                                    <span className="material-icons text-sm">delete</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
-                                    {canEdit && (
-                                        <button 
-                                            onClick={(e) => openTemplateEditor(e, null)}
-                                            className="flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary transition-all group h-full min-h-[160px]"
-                                        >
-                                            <span className="material-icons text-3xl mb-2">library_add</span>
-                                            <span className="text-xs font-bold uppercase tracking-widest">新建 SOP 模板</span>
-                                        </button>
-                                    )}
+                                    <button 
+                                        onClick={(e) => openTemplateEditor(e, null)}
+                                        className="flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary hover:border-primary transition-all group h-full min-h-[160px]"
+                                    >
+                                        <span className="material-icons text-3xl mb-2">library_add</span>
+                                        <span className="text-xs font-bold uppercase tracking-widest">新建 SOP 模板</span>
+                                    </button>
                                 </div>
                             )}
 
@@ -1472,35 +1404,31 @@ const SingleExperimentEditor: React.FC<{
                                                 </div>
                                             </button>
                                             
-                                            {canEdit && (
-                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 dark:bg-black/60 backdrop-blur rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700">
-                                                    <button 
-                                                        onClick={(e) => openBOMEditor(e, bom)}
-                                                        className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-indigo-500 rounded transition-colors"
-                                                        title="编辑 BOM"
-                                                    >
-                                                        <span className="material-icons text-sm">edit</span>
-                                                    </button>
-                                                    <button 
-                                                        onClick={(e) => deleteBOM(e, bom.id)}
-                                                        className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-red-500 rounded transition-colors"
-                                                        title="删除 BOM"
-                                                    >
-                                                        <span className="material-icons text-sm">delete</span>
-                                                    </button>
-                                                </div>
-                                            )}
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 dark:bg-black/60 backdrop-blur rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700">
+                                                <button 
+                                                    onClick={(e) => openBOMEditor(e, bom)}
+                                                    className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-indigo-500 rounded transition-colors"
+                                                    title="编辑 BOM"
+                                                >
+                                                    <span className="material-icons text-sm">edit</span>
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => deleteBOM(e, bom.id)}
+                                                    className="h-7 w-7 flex items-center justify-center text-slate-500 hover:text-red-500 rounded transition-colors"
+                                                    title="删除 BOM"
+                                                >
+                                                    <span className="material-icons text-sm">delete</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
-                                    {canEdit && (
-                                        <button 
-                                            onClick={(e) => openBOMEditor(e, null)}
-                                            className="flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-indigo-500 hover:border-indigo-500 transition-all group h-full min-h-[160px]"
-                                        >
-                                            <span className="material-icons text-3xl mb-2">add_shopping_cart</span>
-                                            <span className="text-xs font-bold uppercase tracking-widest">新建 BOM 模板</span>
-                                        </button>
-                                    )}
+                                    <button 
+                                        onClick={(e) => openBOMEditor(e, null)}
+                                        className="flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-slate-400 hover:text-indigo-500 hover:border-indigo-500 transition-all group h-full min-h-[160px]"
+                                    >
+                                        <span className="material-icons text-3xl mb-2">add_shopping_cart</span>
+                                        <span className="text-xs font-bold uppercase tracking-widest">新建 BOM 模板</span>
+                                    </button>
                                 </div>
                             )}
                         </div>

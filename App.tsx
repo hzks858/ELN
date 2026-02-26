@@ -11,8 +11,6 @@ import { Profile } from './views/Profile';
 import { View } from './types';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DesignProvider, useDesign } from './context/DesignContext';
-import { NotificationProvider } from './context/NotificationContext';
-import { NotificationCenter } from './components/NotificationCenter';
 
 // Placeholder components
 const PlaceholderView: React.FC<{ title: string }> = ({ title }) => (
@@ -101,7 +99,6 @@ const MainLayout: React.FC = () => {
         <div className="flex h-screen w-full overflow-hidden relative">
             <Sidebar activeView={activeView} onNavigate={setActiveView} />
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                <NotificationCenter />
                 
                 {/* Global Edit Mode Toggle (Draggable) */}
                 <div 
@@ -133,11 +130,9 @@ const MainLayout: React.FC = () => {
 const App: React.FC = () => {
     return (
         <AuthProvider>
-            <NotificationProvider>
-                <DesignProvider>
-                    <MainLayout />
-                </DesignProvider>
-            </NotificationProvider>
+            <DesignProvider>
+                <MainLayout />
+            </DesignProvider>
         </AuthProvider>
     );
 };

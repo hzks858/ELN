@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Permission } from '../types';
+import { SidebarItem, View } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 interface Props {
@@ -8,18 +8,16 @@ interface Props {
 }
 
 export const Sidebar: React.FC<Props> = ({ activeView, onNavigate }) => {
-    const { user, hasPermission } = useAuth();
+    const { user } = useAuth();
 
-    const allItems: { id: View; label: string; icon: string; permission?: Permission }[] = [
-        { id: 'experiment', label: '实验', icon: 'science', permission: 'view_experiments' },
-        { id: 'inventory', label: '库存', icon: 'inventory_2', permission: 'manage_inventory' },
-        { id: 'analysis', label: '分析', icon: 'analytics', permission: 'view_analysis' },
-        { id: 'batch', label: '追溯性', icon: 'timeline', permission: 'view_experiments' },
-        { id: 'audit', label: '审计日志', icon: 'fact_check', permission: 'view_audit_log' },
-        { id: 'settings', label: '设置', icon: 'settings', permission: 'manage_users' },
+    const items: SidebarItem[] = [
+        { id: 'experiment', label: '实验', icon: 'science' },
+        { id: 'inventory', label: '库存', icon: 'inventory_2' },
+        { id: 'analysis', label: '分析', icon: 'analytics' },
+        { id: 'batch', label: '追溯性', icon: 'timeline' },
+        { id: 'audit', label: '审计日志', icon: 'fact_check' },
+        { id: 'settings', label: '设置', icon: 'settings' },
     ];
-
-    const items = allItems.filter(item => !item.permission || hasPermission(item.permission));
 
     return (
         <nav className="w-16 lg:w-64 bg-surface-light dark:bg-surface-dark border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0 transition-all duration-300">

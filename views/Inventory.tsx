@@ -1,45 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { useNotification } from '../context/NotificationContext';
-import { useAuth } from '../context/AuthContext';
+import React, { useState } from 'react';
 
 export const Inventory: React.FC = () => {
     const [selectedItem, setSelectedItem] = useState<number | null>(null);
-    const { addNotification } = useNotification();
-    const { hasPermission } = useAuth();
-    const canManage = hasPermission('manage_inventory');
-
-    useEffect(() => {
-        // Simulate checking for low inventory or issues
-        const items = [
-            { id: 4, name: "无水乙醇", status: "过期", qty: "100 mL" },
-            { id: 3, name: "氯化钠", status: "待检", qty: "500 g" }
-        ];
-
-        // Check only once on mount for demo purposes
-        const hasNotified = sessionStorage.getItem('inventory_notified');
-        if (!hasNotified) {
-            items.forEach(item => {
-                if (item.status === '过期') {
-                    addNotification({
-                        type: 'error',
-                        title: '试剂过期警告',
-                        message: `${item.name} 已过期 (剩余 ${item.qty})，请立即处理。`,
-                        actionLabel: '查看',
-                        onAction: () => setSelectedItem(item.id)
-                    });
-                } else if (item.status === '待检') {
-                    addNotification({
-                        type: 'warning',
-                        title: '库存待检提醒',
-                        message: `${item.name} 需要进行质量检测。`,
-                        actionLabel: '查看',
-                        onAction: () => setSelectedItem(item.id)
-                    });
-                }
-            });
-            sessionStorage.setItem('inventory_notified', 'true');
-        }
-    }, []);
 
     return (
         <div className="flex h-full bg-background-light dark:bg-background-dark overflow-hidden">
@@ -82,12 +44,10 @@ export const Inventory: React.FC = () => {
                             <span className="material-icons absolute left-3 top-2.5 text-slate-400 text-lg">search</span>
                             <input className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-primary outline-none" placeholder="搜索库存..." type="text"/>
                         </div>
-                        {canManage && (
-                            <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
-                                <span className="material-icons text-lg">add</span>
-                                接收批次
-                            </button>
-                        )}
+                        <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                            <span className="material-icons text-lg">add</span>
+                            接收批次
+                        </button>
                     </div>
                 </div>
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Role, Permission } from '../types';
+import { User } from '../types';
 
 interface AuthContextType {
     user: User | null;
@@ -7,28 +7,9 @@ interface AuthContextType {
     login: (email: string) => void;
     signup: (name: string, email: string) => void;
     logout: () => void;
-    hasPermission: (permission: Permission) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-    admin: [
-        'view_experiments', 'create_experiment', 'edit_experiment', 'delete_experiment', 
-        'approve_experiment', 'view_audit_log', 'manage_audit_log', 'manage_users', 'manage_inventory',
-        'view_analysis', 'edit_analysis'
-    ],
-    scientist: [
-        'view_experiments', 'create_experiment', 'edit_experiment', 
-        'manage_inventory', 'view_analysis', 'edit_analysis'
-    ],
-    qa: [
-        'view_experiments', 'approve_experiment', 'view_audit_log', 'view_analysis'
-    ],
-    viewer: [
-        'view_experiments', 'view_analysis'
-    ]
-};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -36,37 +17,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const storedUser = localStorage.getItem('helix_user');
         if (storedUser) {
-            try {
-                const parsedUser = JSON.parse(storedUser);
-                // Migration: Ensure permissions exist for legacy data
-                if (parsedUser && !parsedUser.permissions && parsedUser.role) {
-                    parsedUser.permissions = ROLE_PERMISSIONS[parsedUser.role as Role] || [];
-                }
-                setUser(parsedUser);
-            } catch (error) {
-                console.error('Failed to parse user data:', error);
-                localStorage.removeItem('helix_user');
-            }
+            setUser(JSON.parse(storedUser));
         }
     }, []);
 
-    const hasPermission = (permission: Permission): boolean => {
-        if (!user || !user.permissions) return false;
-        return user.permissions.includes(permission);
-    };
-
     const login = (email: string) => {
-        // Mock login with role assignment based on email
-        let role: Role = 'scientist';
-        if (email.includes('admin')) role = 'admin';
-        else if (email.includes('qa')) role = 'qa';
-        else if (email.includes('viewer')) role = 'viewer';
-
+        // Mock login
         const mockUser: User = {
             name: email.split('@')[0],
             email,
-            role,
-            permissions: ROLE_PERMISSIONS[role],
+            role: '高级科学家',
             initials: email.substring(0, 2).toUpperCase(),
             avatar: 'https://ui-avatars.com/api/?background=1973f0&color=fff&name=' + email.split('@')[0]
         };
@@ -75,13 +35,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const signup = (name: string, email: string) => {
-        // Default new users to scientist
-        const role: Role = 'scientist';
         const mockUser: User = {
             name,
             email,
-            role,
-            permissions: ROLE_PERMISSIONS[role],
+            role: '科学家',
             initials: name.substring(0, 2).toUpperCase(),
             avatar: 'https://ui-avatars.com/api/?background=1973f0&color=fff&name=' + name
         };
@@ -95,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout, hasPermission }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout }}>
             {children}
         </AuthContext.Provider>
     );
